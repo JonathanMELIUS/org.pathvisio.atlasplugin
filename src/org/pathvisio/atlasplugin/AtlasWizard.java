@@ -11,15 +11,11 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 import javax.swing.ButtonGroup;
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
-import javax.swing.JFileChooser;
-import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -31,14 +27,9 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingWorker;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 
 import org.bridgedb.DataSource;
 import org.bridgedb.IDMapperException;
-import org.bridgedb.gui.SimpleFileFilter;
 import org.bridgedb.rdb.construct.DBConnector;
 import org.pathvisio.core.debug.Logger;
 import org.pathvisio.core.preferences.GlobalPreference;
@@ -52,11 +43,11 @@ import org.pathvisio.data.DataInterface;
 import org.pathvisio.desktop.PvDesktop;
 import org.pathvisio.desktop.data.DBConnectorSwing;
 import org.pathvisio.desktop.visualization.ColorGradient;
+import org.pathvisio.desktop.visualization.ColorGradient.ColorValuePair;
 import org.pathvisio.desktop.visualization.ColorSet;
 import org.pathvisio.desktop.visualization.ColorSetManager;
 import org.pathvisio.desktop.visualization.Visualization;
 import org.pathvisio.desktop.visualization.VisualizationManager;
-import org.pathvisio.desktop.visualization.ColorGradient.ColorValuePair;
 import org.pathvisio.gexplugin.GexTxtImporter;
 import org.pathvisio.gexplugin.ImportInformation;
 import org.pathvisio.visualization.plugins.ColorByExpression;
@@ -318,7 +309,7 @@ public class AtlasWizard extends Wizard
 			JButton add = new JButton(">>");
 			add.addActionListener(new ActionListener(){
 				public void actionPerformed(ActionEvent e) {
-					for (  Object tissue : list.getSelectedValuesList() ){
+					for (  Object tissue : list.getSelectedValues() ){
 						if (!selectedTissues.contains(tissue)){
 							selectedTissues.add((String) tissue);
 							list2.setListData(selectedTissues.toArray());
@@ -329,7 +320,9 @@ public class AtlasWizard extends Wizard
 			JButton remove = new JButton("<<");
 			remove.addActionListener(new ActionListener(){
 				public void actionPerformed(ActionEvent e) {
-					selectedTissues.removeAll(list2.getSelectedValuesList());
+					for(Object str : list2.getSelectedValues()) {
+						selectedTissues.remove(str);
+					}
 					list2.setListData(selectedTissues.toArray());
 				}
 			});
@@ -556,6 +549,7 @@ public class AtlasWizard extends Wizard
 		ColorByExpression cby = new ColorByExpression(standaloneEngine.getGexManager(), 
 				standaloneEngine.getVisualizationManager().getColorSetManager());
 		DataInterface gex = standaloneEngine.getGexManager().getCurrentGex();
+		
 		int count = Math.min (5, gex.getSamples().keySet().size());
 		for (int i = 0; i < count; ++i)
 		{
