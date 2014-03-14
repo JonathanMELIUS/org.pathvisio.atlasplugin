@@ -1,3 +1,19 @@
+// PathVisio,
+// a tool for data visualization and analysis using Biological Pathways
+// Copyright 2006-2011 BiGCaT Bioinformatics
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 package org.pathvisio.atlasplugin;
 
 import java.awt.Color;
@@ -7,7 +23,6 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
@@ -27,6 +42,8 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingWorker;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 import org.bridgedb.DataSource;
 import org.bridgedb.IDMapperException;
@@ -60,7 +77,11 @@ import com.jgoodies.forms.layout.FormLayout;
 import com.nexes.wizard.Wizard;
 import com.nexes.wizard.WizardPanelDescriptor;
 
-
+/**
+ * Wizard to guide the user through importing data set from Expression Atlas
+ * in PathVisio.
+ * @author Jonathan Melius
+ */
 public class AtlasWizard extends Wizard
 {
 	private ImportInformation importInformation;
@@ -72,8 +93,9 @@ public class AtlasWizard extends Wizard
 
 	private final PvDesktop standaloneEngine;
 
-	public static final String ex1="E-MTAB-513";
-	public static final String ex2="E-MTAB-1733";
+	public static final String first_experiment="E-MTAB-513";
+	public static final String second_experiment="E-MTAB-1733";
+
 	public AtlasWizard (PvDesktop standaloneEngine)
 	{
 		this.standaloneEngine = standaloneEngine;
@@ -87,7 +109,6 @@ public class AtlasWizard extends Wizard
 		registerWizardPanel(fpd);
 		registerWizardPanel(tpd);
 		registerWizardPanel(ipd);
-		//setCurrentPanel(TissuesPage.IDENTIFIER);
 		setCurrentPanel(FilePage.IDENTIFIER);
 	}
 
@@ -101,11 +122,12 @@ public class AtlasWizard extends Wizard
 		private JTextField txtGdb;
 		private JButton btnGdb;
 		private JButton btnOutput;
-		ButtonGroup group;
+		private ButtonGroup group;
+		boolean txtOutputComplete;
 
 		public void aboutToDisplayPanel()
 		{
-			getWizard().setNextFinishButtonEnabled(false);
+			getWizard().setNextFinishButtonEnabled(txtOutputComplete);
 			getWizard().setPageTitle ("Choose an experiments and the file locations");
 		}
 
@@ -123,6 +145,18 @@ public class AtlasWizard extends Wizard
 		{
 			return null;
 		}
+		/**
+		 * Check the text output field. If it's empty the user can't continue
+		 */
+		public void updateTxt(){
+			if (txtOutput.getText().equals("")){
+				txtOutputComplete=false;
+			}
+			else {				
+				txtOutputComplete = true;					
+			}
+			getWizard().setNextFinishButtonEnabled(txtOutputComplete);
+		}
 
 		protected JPanel createContents()
 		{
@@ -132,11 +166,11 @@ public class AtlasWizard extends Wizard
 			btnOutput = new JButton ("Browse");
 
 			//The radio buttons.
-			JRadioButton FirstRButton = new JRadioButton("E-MTAB-1733");
+			JRadioButton FirstRButton = new JRadioButton(second_experiment);
 			FirstRButton.setSelected(true);
-			FirstRButton.setActionCommand("E-MTAB-1733");
-			JRadioButton SecondRButton = new JRadioButton("E-MTAB-513");
-			SecondRButton.setActionCommand("E-MTAB-513");
+			FirstRButton.setActionCommand(second_experiment);
+			JRadioButton SecondRButton = new JRadioButton(first_experiment);
+			SecondRButton.setActionCommand(first_experiment);
 
 			//Group the radio buttons.
 			group = new ButtonGroup();
@@ -152,12 +186,12 @@ public class AtlasWizard extends Wizard
 			CellConstraints cc = new CellConstraints();			
 
 			builder.add(FirstRButton,cc.xy (1,1));
-			builder.addLabel ("RNA-Seq of human individual tissues "
-					+ "and mixture of 16 tissues (Illumina Body Map)",
-					cc.xy (3,1));
-			builder.add(SecondRButton,cc.xy (1,3));
 			builder.addLabel ("RNA-seq of coding RNA from tissue samples"
 					+ " representing 27 different tissues",
+					cc.xy (3,1));			
+			builder.add(SecondRButton,cc.xy (1,3));
+			builder.addLabel ("RNA-Seq of human individual tissues "
+					+ "and mixture of 16 tissues (Illumina Body Map)",
 					cc.xy (3,3));
 			builder.addLabel ("Output file", cc.xy (1,7));
 			builder.add (txtOutput, cc.xy (3,7));
@@ -175,13 +209,39 @@ public class AtlasWizard extends Wizard
 					PreferenceManager.getCurrent()
 					.get(GlobalPreference.DB_CONNECTSTRING_GDB)
 					);
+			txtOutput.getDocument().addDocumentListener(new DocumentListener()
+			{
+				public void changedUpdate(DocumentEvent arg0)
+				{
+					updateTxt();
+				}
+
+				public void insertUpdate(DocumentEvent arg0)
+				{
+					updateTxt();
+				}
+
+				public void removeUpdate(DocumentEvent arg0)
+				{
+					updateTxt();
+				}
+
+			});
 			return builder.getPanel();
 		}
 
 		public void aboutToHidePanel()
 		{
-			//importInformation.guessSettings();
-			importInformation.setGexName (txtOutput.getText());
+			String outFile = null;
+			File f = new File(txtOutput.getText());
+			try {
+				f.getCanonicalPath();
+				f=FileUtils.replaceExtension(f, "pgex");
+				outFile = f.getCanonicalPath();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}	
+			importInformation.setGexName (outFile);
 			experiment = group.getSelection().getActionCommand();
 		}
 
@@ -219,15 +279,14 @@ public class AtlasWizard extends Wizard
 	private class TissuesPage extends WizardPanelDescriptor 
 	{
 		public static final String IDENTIFIER = "TISSUES_PAGE";
+		private static final String gene_ID = "Gene ID";
 		JTextField cutoff;
 
-		private JList list;
-		private JList list2;
+		private JList choice_list;
+		private JList selected_list;
 
 		private ArrayList<String> listOfTissues;
 		private ArrayList<String> selectedTissues;
-		private ArrayList<String> tissues513;
-		private ArrayList<String> tissues1733;
 
 		public TissuesPage()
 		{	
@@ -236,11 +295,9 @@ public class AtlasWizard extends Wizard
 		public void aboutToDisplayPanel()
 		{
 			getWizard().setPageTitle ("Choose the tissues");
-			if (experiment.equals("E-MTAB-513"))
-			{
-				listOfTissues = new ArrayList<String>(tissues513);
-			}			
-			list.setListData(listOfTissues.toArray());
+			Tissues tissues = new Tissues(experiment);
+			listOfTissues = tissues.getTissuesList();			
+			choice_list.setListData(listOfTissues.toArray());
 		}
 		public Object getNextPanelDescriptor()
 		{
@@ -252,26 +309,7 @@ public class AtlasWizard extends Wizard
 			return FilePage.IDENTIFIER;
 		}
 
-		protected Component createContents() {
-			tissues1733= new ArrayList<String>(
-					Arrays.asList("adipose tissue",	"adrenal gland",
-							"animal ovary",
-							"appendix", "bladder","bone marrow",
-							"cerebral cortex","colon","duodenum",	
-							"endometrium","esophagus","gall bladder",
-							"heart","kidney","liver","lung",
-							"lymph node","pancreas","placenta",
-							"prostate","salivary gland","skin",
-							"small intestine","spleen","stomach",
-							"testis","thyroid"));
-			tissues513 = new ArrayList<String>(
-					Arrays.asList("adipose","adrenal","brain",
-							"breast","colon","heart","kidney",
-							"leukocyte","liver","lung","lymph node",
-							"ovary","prostate","skeletal","muscle",
-							"testis","thyroid"));
-
-
+		protected Component createContents() {			
 			cutoff = new JTextField();
 
 
@@ -279,40 +317,36 @@ public class AtlasWizard extends Wizard
 					"pref:grow",
 					"fill:[100dlu,min]:grow");*/
 			FormLayout layout = new FormLayout (
-					"pref, 25dlu, pref, 25dlu, pref, 25dlu, pref",
+					"pref, 25dlu, pref, 25dlu, pref, 25dlu, pref, 75dlu, pref",
 					"p, 3dlu, p, 3dlu, p");
 			PanelBuilder builder = new PanelBuilder(layout);
 			builder.setDefaultDialogBorder();
 			CellConstraints cc = new CellConstraints();	
 
-			selectedTissues = new ArrayList<String>();					
-			listOfTissues = new ArrayList<String>(tissues1733);
-
+			selectedTissues = new ArrayList<String>();
+			listOfTissues = new ArrayList<String>(
+					Arrays.asList(" "));
 
 			//Create the list and put it in a scroll pane.
-			list = new JList(listOfTissues.toArray());
-			list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION );
-			list.setSelectedIndex(0);
-			//list.addListSelectionListener(this);
-			//list.setVisibleRowCount(5);
-			list.setLayoutOrientation(JList.VERTICAL);
+			choice_list = new JList(listOfTissues.toArray());
+			choice_list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION );
+			choice_list.setSelectedIndex(0);
+			choice_list.setLayoutOrientation(JList.VERTICAL);
 
-			list2 = new JList(selectedTissues.toArray());
-			list2.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION );
-			list2.setSelectedIndex(0);
-			//list2.addListSelectionListener(this);
-			//list2.setVisibleRowCount(5);
+			selected_list = new JList(selectedTissues.toArray());
+			selected_list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION );
+			selected_list.setSelectedIndex(0);
 
-			JScrollPane listScrollPane = new JScrollPane(list);
-			JScrollPane listScrollPane2 = new JScrollPane(list2);
+			JScrollPane choiceScrollPane = new JScrollPane(choice_list);
+			JScrollPane selectedScrollPane = new JScrollPane(selected_list);
 
 			JButton add = new JButton(">>");
 			add.addActionListener(new ActionListener(){
 				public void actionPerformed(ActionEvent e) {
-					for (  Object tissue : list.getSelectedValues() ){
+					for (  Object tissue : choice_list.getSelectedValues() ){
 						if (!selectedTissues.contains(tissue)){
 							selectedTissues.add((String) tissue);
-							list2.setListData(selectedTissues.toArray());
+							selected_list.setListData(selectedTissues.toArray());
 						}
 					}					
 				}
@@ -320,23 +354,23 @@ public class AtlasWizard extends Wizard
 			JButton remove = new JButton("<<");
 			remove.addActionListener(new ActionListener(){
 				public void actionPerformed(ActionEvent e) {
-					for(Object str : list2.getSelectedValues()) {
+					for(Object str : selected_list.getSelectedValues()) {
 						selectedTissues.remove(str);
 					}
-					list2.setListData(selectedTissues.toArray());
+					selected_list.setListData(selectedTissues.toArray());
 				}
 			});
-			builder.add (listScrollPane, cc.xy(1,1));
-			builder.add (add, cc.xy (2,1));
-			builder.add (remove, cc.xy (2,3));
-			builder.add (listScrollPane2, cc.xy(3,1));
-			builder.addLabel("cutoff", cc.xy (4,1));
-			builder.add(cutoff, cc.xy (4,3));
+			builder.add (choiceScrollPane, cc.xy(5,1));
+			builder.add (add, cc.xy (7,1));
+			builder.add (remove, cc.xy (6,1));
+			builder.add (selectedScrollPane, cc.xy(8,1));
+			builder.addLabel("cutoff", cc.xy (5,3));
+			builder.add(cutoff, cc.xy (6,3));
 
 			return builder.getPanel();
 		}
 		public void aboutToHidePanel()
-		{
+		{				
 			String organQuery="";
 			for (String organ : selectedTissues){
 				organQuery += "&queryFactorValues="+organ;
@@ -355,28 +389,19 @@ public class AtlasWizard extends Wizard
 						"&_queryFactorValues=1" +
 						"&specific=true" +
 						"&_specific=on" +
-						"&cutoff="+cutoff.getText());
-			}
-			catch (MalformedURLException e1) {
-				e1.printStackTrace();
-			}			
+						"&cutoff="+cutoff.getText());						
 
-			try {				
 				String tDir = System.getProperty("java.io.tmpdir");
 				File filename = File.createTempFile(tDir+"AtlasQuery", ".tmp");
 				filename.deleteOnExit();
-				
+
+
 				ReadableByteChannel rbc = Channels.newChannel(url.openStream());
 				FileOutputStream fos = new FileOutputStream(filename);		
 				fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
 
 				DataSource ds = DataSource.getBySystemCode("En");
-				
-				
-				
-				//importInformation = new ImportInformation();
 
-				//importInformation.setTxtFromAtlas(lines);
 				importInformation.setTxtFile(filename);
 				importInformation.setFirstDataRow(4);
 				importInformation.setFirstHeaderRow(3);
@@ -388,7 +413,7 @@ public class AtlasWizard extends Wizard
 
 			} catch (IOException e) {
 				e.printStackTrace();
-			}	
+			}
 		}
 	}
 
@@ -549,11 +574,10 @@ public class AtlasWizard extends Wizard
 		ColorByExpression cby = new ColorByExpression(standaloneEngine.getGexManager(), 
 				standaloneEngine.getVisualizationManager().getColorSetManager());
 		DataInterface gex = standaloneEngine.getGexManager().getCurrentGex();
-		
+
 		int count = Math.min (5, gex.getSamples().keySet().size());
 		for (int i = 0; i < count; ++i)
-		{
-			//TODO: check that these samples contain numeric data
+		{			
 			cby.addUseSample(gex.getSample(i));
 		}
 		cby.setSingleColorSet(cs);
