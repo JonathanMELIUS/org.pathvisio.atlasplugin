@@ -20,6 +20,7 @@ package org.pathvisio.atlasplugin;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.pathvisio.desktop.plugin.Plugin;
+import org.pathvisio.tissueanalyzer.TissuePlugin;
 
 public class Activator implements BundleActivator {
 
@@ -28,16 +29,21 @@ public class Activator implements BundleActivator {
 	static BundleContext getContext() {
 		return context;
 	}
-	private AtlasPlugin plugin;
+	//private Naje naje;
+	private AtlasPlugin atlasPlugin;
+	private TissuePlugin tissuePlugin;
 
 	 @Override
 	 public void start(BundleContext context) throws Exception {
-	    plugin = new AtlasPlugin(); 
-	    context.registerService(Plugin.class.getName(), plugin, null);
+		atlasPlugin = new AtlasPlugin();
+		tissuePlugin = new TissuePlugin();
+	    context.registerService(Plugin.class.getName(), atlasPlugin, null);
+	    context.registerService(Plugin.class.getName(), tissuePlugin, null);
 	 }
 
 	 @Override
 	 public void stop(BundleContext context) throws Exception {
-	    plugin.done();	 
+		atlasPlugin.done();
+	    tissuePlugin.done();
 	 }
 }
