@@ -2,6 +2,7 @@ package org.pathvisio.atlasplugin;
 
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -12,6 +13,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -48,10 +53,12 @@ import org.pathvisio.core.util.ProgressKeeper.ProgressEvent;
 import org.pathvisio.core.util.ProgressKeeper.ProgressListener;
 import org.pathvisio.data.DataException;
 import org.pathvisio.data.DataInterface;
+import org.pathvisio.data.ISample;
 import org.pathvisio.desktop.PvDesktop;
 import org.pathvisio.desktop.data.DBConnectorSwing;
 import org.pathvisio.desktop.util.RowNumberHeader;
 import org.pathvisio.desktop.visualization.ColorGradient;
+import org.pathvisio.desktop.visualization.ColorRule;
 import org.pathvisio.desktop.visualization.ColorSet;
 import org.pathvisio.desktop.visualization.ColorSetManager;
 import org.pathvisio.desktop.visualization.Visualization;
@@ -63,6 +70,7 @@ import org.pathvisio.gui.DataSourceModel;
 import org.pathvisio.gui.util.PermissiveComboBox;
 import org.pathvisio.visualization.plugins.ColorByExpression;
 import org.pathvisio.visualization.plugins.DataNodeLabel;
+import org.pathvisio.visualization.plugins.ColorByExpression.ConfiguredSample;
 
 import com.hp.hpl.jena.query.ParameterizedSparqlString;
 import com.hp.hpl.jena.query.Query;
@@ -90,7 +98,7 @@ public class AtlasWizard extends Wizard
 	private static final String COMMIT_ACTION = "commit";
 
 	private final PvDesktop standaloneEngine;
-	
+	private static ArrayList<String> idExperiment = new ArrayList<String>();
 
 
 	public AtlasWizard (PvDesktop standaloneEngine)
@@ -101,7 +109,7 @@ public class AtlasWizard extends Wizard
 		fpd = new FilePage();
 		cpd = new ColumnPage();
 		ipd = new ImportPage();
-		
+
 
 		getDialog().setTitle ("Atlas Expression data import wizard");
 		registerWizardPanel(fpd);
@@ -112,17 +120,19 @@ public class AtlasWizard extends Wizard
 	private class FilePage extends WizardPanelDescriptor implements ActionListener
 	{
 		public static final String IDENTIFIER = "FILE_PAGE";
-		static final String ACTION_OUTPUT = "output";
-		static final String ACTION_GDB = "gdb";
+		private static final String ACTION_OUTPUT = "output";
+		private static final String ACTION_GDB = "gdb";
 
 		private JTextField expInput;
 		private JTextField txtOutput;
 		private JTextField txtGdb;
 		private JButton btnGdb;
 		private JButton btnOutput;
-		boolean txtOutputComplete;
-		
-		ArrayList<String> idExperiment;
+		private boolean txtOutputComplete;
+		private JProgressBar progressBar;
+		ArrayList<String> queryList;
+		Map<String, Map<String, LinkedList<SparqlResults>>> data ;
+		//ArrayList<String> idExperiment;
 
 		public void aboutToDisplayPanel()
 		{
@@ -150,7 +160,7 @@ public class AtlasWizard extends Wizard
 		public void updateTxt(){
 			ArrayList<String> queryList = new ArrayList<String>(Arrays.asList(expInput.getText().split(" ")));
 			if ( (!txtOutput.getText().equals(""))
-								&& (idExperiment.containsAll(queryList)) ) {
+					&& (idExperiment.containsAll(queryList)) ) {
 				txtOutputComplete=true;
 			}
 			else {				
@@ -167,53 +177,44 @@ public class AtlasWizard extends Wizard
 			txtGdb = new JTextField(40);
 			btnGdb = new JButton ("Browse");;
 			btnOutput = new JButton ("Browse");
-			idExperiment = new ArrayList<String>();
 			expInput.setFocusTraversalKeysEnabled(false);
-			String sparqlEndpoint = "http://www.ebi.ac.uk/rdf/services/atlas/sparql";
-			String sparqlQuery =
-							"PREFIX dcterms: <http://purl.org/dc/terms/>"+
-							"PREFIX atlasterms: <http://rdf.ebi.ac.uk/terms/atlas/>"+
-							"PREFIX xsd:<http://www.w3.org/2001/XMLSchema#>"+
-							"SELECT DISTINCT ?id  WHERE {"+
-							"?experiment a atlasterms:Experiment ."+
-							"?experiment dcterms:identifier ?id."+   
-							"?experiment atlasterms:hasAnalysis ?analysis ."+
-							"}";
-			
-			Query query = QueryFactory.create(sparqlQuery, Syntax.syntaxARQ) ;
 
-			ParameterizedSparqlString parameterizedSparqlString = new ParameterizedSparqlString(query.toString());
+			progressBar = new JProgressBar(0, 100);
+			progressBar.setValue(0);
+			progressBar.setStringPainted(true);
 
-			QueryEngineHTTP httpQuery = new QueryEngineHTTP(sparqlEndpoint,parameterizedSparqlString.asQuery());
-			// execute a Select query
-			ResultSet results = httpQuery.execSelect();
-			while (results.hasNext()) {
-				QuerySolution solution = results.next();
-				// get the value of the variables in the select clause
-				String id = solution.get("id").asLiteral().getLexicalForm();
-				idExperiment.add(id);
+			if (idExperiment.isEmpty()){
+				System.out.println("just once upon the time");
+				String sparqlEndpoint = "http://www.ebi.ac.uk/rdf/services/atlas/sparql";
+				String sparqlQuery =
+						"PREFIX dcterms: <http://purl.org/dc/terms/>"+
+								"PREFIX atlasterms: <http://rdf.ebi.ac.uk/terms/atlas/>"+
+								"PREFIX xsd:<http://www.w3.org/2001/XMLSchema#>"+
+								"SELECT DISTINCT ?id  WHERE {"+
+								"?experiment a atlasterms:Experiment ."+
+								"?experiment dcterms:identifier ?id."+   
+								"?experiment atlasterms:hasAnalysis ?analysis ."+
+								"}";
+
+				Query query = QueryFactory.create(sparqlQuery, Syntax.syntaxARQ) ;
+
+				ParameterizedSparqlString parameterizedSparqlString = new ParameterizedSparqlString(query.toString());
+
+				QueryEngineHTTP httpQuery = new QueryEngineHTTP(sparqlEndpoint,parameterizedSparqlString.asQuery());
+				// execute a Select query
+				ResultSet results = httpQuery.execSelect();
+				while (results.hasNext()) {
+					QuerySolution solution = results.next();
+					// get the value of the variables in the select clause
+					String id = solution.get("id").asLiteral().getLexicalForm();
+					idExperiment.add(id);
+				}
 			}
-		
 			System.out.println(idExperiment.size());
-			// Our words to complete
-			
-			/*
-			Auto autoComplete = new Auto(expInput, idExperiment);
-
-
-			expInput.getDocument().addDocumentListener(autoComplete);
-
-			// Maps the tab key to the commit action, which finishes the autocomplete
-			// when given a suggestion
-			expInput.getInputMap().put(KeyStroke.getKeyStroke("TAB"), COMMIT_ACTION);
-			expInput.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,0), COMMIT_ACTION);
-			expInput.getInputMap().put(KeyStroke.getKeyStroke("SPACE"), COMMIT_ACTION);
-			expInput.getActionMap().put(COMMIT_ACTION, autoComplete.new CommitAction());
-			 */
 
 			FormLayout layout = new FormLayout (
 					"right:pref, 3dlu, pref, 3dlu, pref",
-					"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p");
+					"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, pref");
 
 			PanelBuilder builder = new PanelBuilder(layout);
 			builder.setDefaultDialogBorder();
@@ -227,6 +228,7 @@ public class AtlasWizard extends Wizard
 			builder.addLabel ("Gene database", cc.xy (1,9));
 			builder.add (txtGdb, cc.xy (3,9));
 			builder.add (btnGdb, cc.xy (5,9));
+			builder.add(progressBar, cc.xy(3, 11));
 
 			btnOutput.addActionListener(this);
 			btnOutput.setActionCommand(ACTION_OUTPUT);
@@ -237,7 +239,7 @@ public class AtlasWizard extends Wizard
 					PreferenceManager.getCurrent()
 					.get(GlobalPreference.DB_CONNECTSTRING_GDB)
 					);
-			
+
 			expInput.getDocument().addDocumentListener(new DocumentListener()
 			{
 				public void changedUpdate(DocumentEvent arg0)
@@ -279,48 +281,121 @@ public class AtlasWizard extends Wizard
 
 		public void aboutToHidePanel()
 		{
+			/*
+			experiment = expInput.getText();
 			String outFile = null;
 			File f = new File(txtOutput.getText());
-			String path = "/home/mael/outpute.txt";
-			File file = null;
-			PrintWriter f0 = null;			
 			try {
 				f.getCanonicalPath();
 				f=FileUtils.replaceExtension(f, "pgex");
 				outFile = f.getCanonicalPath();
-				
-				file = new File(path);
-				f0 = new PrintWriter(new FileWriter(file));
-				f0.println("id"+"\t"+"Experiment_ID"+"\t"+"propertyValue"+"\t"+"pValue"+"\t"+"tStat");
-				f0.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			
-			importInformation.setGexName (outFile);
-			experiment = expInput.getText();
-			ArrayList<String> queryList = new ArrayList<String>(Arrays.asList(experiment.split(" ")));
-			for (String query : queryList){
-				System.out.println(query);
-				new SparqlQuery (query,file);
-			}
-			//E-GEOD-18842 E-GEOD-6731 E-GEOD-8977 E-GEOD-6088
-			//new SparqlQuery ("E-GEOD-18842",file);
-			//new SparqlQuery ("E-GEOD-6731",file);
-			//new SparqlQuery (experiment,file);
-			
-			//E-GEOD-10821
-
-			try {
-				importInformation.setTxtFile(file);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+
+			importInformation.setGexName (outFile);*/
+
+			getWizard().getDialog().setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+			getWizard().setNextFinishButtonEnabled(false);
+			getWizard().setBackButtonEnabled(false);
+			String outFile = null;
+			File f = new File(txtOutput.getText());
+			String path = "/home/mael/outpute.txt";
+			File file = null;
+			PrintWriter fileWriter = null;
+
+			experiment = expInput.getText();
+
+			queryList = new ArrayList<String>(Arrays.asList(experiment.split(" ")));
+			data = new HashMap<String,Map<String,LinkedList<SparqlResults>>>();
+
+			String prop = "propertyValue";
+			String pValue ="pValue";
+			String tStat = "tStat";
+			String probe = "probe";
+			String header = "Gene_ID";
+
+			try {
+				f.getCanonicalPath();
+				f=FileUtils.replaceExtension(f, "pgex");
+				outFile = f.getCanonicalPath();
+
+				file = new File(path);
+				fileWriter = new PrintWriter(new FileWriter(file));
+				for (String query : queryList){
+					header += "\t"+query+"-"+probe+"\t"+query+"-"+prop+"\t"+query+"-"+pValue+"\t"+query+"-"+tStat;
+				}
+				fileWriter.println(header);
+				//f0.close();
+				//f0 = new PrintWriter(new FileWriter(file, true));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}	
+			int progress = 0 ;
+			for (String query : queryList){
+				System.out.println(query);
+				//new SparqlQuery (query,file);
+				new SparqlQuery (query,data);
+				progress += 100/queryList.size();
+				System.out.println(progress);
+				progressBar.setValue(progress);
+			}
+
+			//E-GEOD-18842 E-GEOD-6731 E-GEOD-8977 E-GEOD-6088
+			//new SparqlQuery ("E-GEOD-18842",file);
+			//new SparqlQuery ("E-GEOD-6731",file);
+			//new SparqlQuery (experiment,file);
+
+			//E-GEOD-10821
+
+			for(Entry<String,Map<String,LinkedList<SparqlResults>>> entry : data.entrySet()) {
+				String key = entry.getKey();
+				Map<String,LinkedList<SparqlResults>> value = entry.getValue();
+				ArrayList<LinkedList<SparqlResults>> resultList = new ArrayList<LinkedList<SparqlResults>>();
+				for(Entry<String,LinkedList<SparqlResults>> expEntry : value.entrySet()) {
+					resultList.add(expEntry.getValue());
+				}				
+				while (listIsEmpty(resultList)){
+					String line = key;
+					String[] tab = new String[queryList.size()];
+					ArrayList<String> test = new ArrayList<String>(Arrays.asList(tab));
+					for (LinkedList<SparqlResults> lili : resultList) {
+						SparqlResults sparql = lili.pollFirst();
+						if (!(sparql==null)){
+							int index = queryList.indexOf(sparql.getExp());
+							String lineTest = "\t"+sparql.getProb()+
+									"\t"+sparql.getProp()+
+									"\t"+sparql.getPv()+"\t"+sparql.getTs();
+							test.set(index, lineTest);
+							//System.out.println("------"+sparql.getProb());
+						}
+					}
+					for (String ss : test){
+						if (ss==null){
+							//line +="\t"+"NA"+"\t"+"NA"+"\t"+"NA"+"\t"+"NA"; 
+							line +="\t"+""+"\t"+""+"\t"+""+"\t"+""; 
+						}
+						else line += ss;
+					}
+					fileWriter.println(line);
+					//System.out.println(line);	
+				}
+			}
+			fileWriter.close();
+
+			try {
+				importInformation.setTxtFile(file);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			importInformation.setGexName (outFile);
 			importInformation.setFirstDataRow(1);
 			importInformation.setFirstHeaderRow(0);
 			importInformation.guessSettings();
 			importInformation.setDelimiter("\t");
+
+			getWizard().getDialog().setCursor(null);
 		}
 
 		public void actionPerformed(ActionEvent e) {
@@ -353,48 +428,240 @@ public class AtlasWizard extends Wizard
 				}
 			}
 		}
+		public boolean listIsEmpty(ArrayList<LinkedList<SparqlResults>> arrayList){
+			int i=0;
+			for (LinkedList<SparqlResults> linked : arrayList){
+				if (linked.isEmpty()){
+					i++;
+				}			
+			}
+			if (i==arrayList.size()){
+				return false;
+			}		
+			return true;		
+		}
 	}
-	
+	/*private class DownloadPage extends WizardPanelDescriptor
+	{
+
+		public static final String IDENTIFIER = "DOWNLOAD_PAGE";
+
+		private JProgressBar progressBar;
+		private JTextArea progressText;
+		private JLabel lblTask;
+
+		private ArrayList<String> queryList;
+		private Map<String, Map<String, LinkedList<SparqlResults>>> data ;
+
+		public DownloadPage() {
+			super(IDENTIFIER);
+		}
+
+		public Object getNextPanelDescriptor()
+		{
+			return ColumnPage.IDENTIFIER;
+		}
+
+		public Object getBackPanelDescriptor()
+		{
+			return FilePage.IDENTIFIER;
+		}
+
+		@Override
+		protected JPanel createContents() {
+			FormLayout layout = new FormLayout(
+					"fill:[100dlu,min]:grow",
+					"pref, pref, fill:pref:grow"
+					);
+
+			DefaultFormBuilder builder = new DefaultFormBuilder(layout);
+			builder.setDefaultDialogBorder();
+
+			progressBar = new JProgressBar(0, 100);
+			builder.append(progressBar);
+			builder.nextLine();
+			lblTask = new JLabel();
+			builder.append(lblTask);
+			progressText = new JTextArea();
+			builder.append(new JScrollPane(progressText));
+			return builder.getPanel();
+		}
+		public void aboutToDisplayPanel()
+		{
+			getWizard().setPageTitle ("Perform import");
+
+			getWizard().setNextFinishButtonEnabled(false);
+			getWizard().setBackButtonEnabled(false);
+		}
+
+		public void displayingPanel()
+		{			
+			SwingWorker<Void, Void> sw = new SwingWorker<Void, Void>() {
+				@Override protected Void doInBackground() {
+					getWizard().getDialog().setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+					getWizard().setNextFinishButtonEnabled(false);
+					getWizard().setBackButtonEnabled(false);
+					//String outFile = null;
+					//File f = new File(txtOutput.getText());
+					String path = "/home/mael/outpute.txt";
+					File file = null;
+					PrintWriter fileWriter = null;
+
+					//experiment = expInput.getText();
+
+					queryList = new ArrayList<String>(Arrays.asList(experiment.split(" ")));
+					data = new HashMap<String,Map<String,LinkedList<SparqlResults>>>();
+
+					String prop = "propertyValue";
+					String pValue ="pValue";
+					String tStat = "tStat";
+					String probe = "probe";
+					String header = "Gene_ID";
+
+					try {
+						//f.getCanonicalPath();
+						//f=FileUtils.replaceExtension(f, "pgex");
+						//outFile = f.getCanonicalPath();
+
+						file = new File(path);
+						fileWriter = new PrintWriter(new FileWriter(file));
+						for (String query : queryList){
+							header += "\t"+query+"-"+probe+"\t"+query+"-"+prop+"\t"+query+"-"+pValue+"\t"+query+"-"+tStat;
+						}
+						fileWriter.println(header);
+						//f0.close();
+						//f0 = new PrintWriter(new FileWriter(file, true));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}	
+					int progress = 0 ;
+					for (String query : queryList){
+						System.out.println(query);
+						//new SparqlQuery (query,file);
+						new SparqlQuery (query,data);
+						progress += 100/queryList.size();
+						System.out.println(progress);
+						progressBar.setValue(progress);
+					}
+
+					//E-GEOD-18842 E-GEOD-6731 E-GEOD-8977 E-GEOD-6088
+					//new SparqlQuery ("E-GEOD-18842",file);
+					//new SparqlQuery ("E-GEOD-6731",file);
+					//new SparqlQuery (experiment,file);
+
+					//E-GEOD-10821
+
+					for(Entry<String,Map<String,LinkedList<SparqlResults>>> entry : data.entrySet()) {
+						String key = entry.getKey();
+						Map<String,LinkedList<SparqlResults>> value = entry.getValue();
+						ArrayList<LinkedList<SparqlResults>> resultList = new ArrayList<LinkedList<SparqlResults>>();
+						for(Entry<String,LinkedList<SparqlResults>> expEntry : value.entrySet()) {
+							resultList.add(expEntry.getValue());
+						}				
+						while (listIsEmpty(resultList)){
+							String line = key;
+							String[] tab = new String[queryList.size()];
+							ArrayList<String> test = new ArrayList<String>(Arrays.asList(tab));
+							for (LinkedList<SparqlResults> lili : resultList) {
+								SparqlResults sparql = lili.pollFirst();
+								if (!(sparql==null)){
+									int index = queryList.indexOf(sparql.getExp());
+									String lineTest = "\t"+sparql.getProb()+
+											"\t"+sparql.getExp()+sparql.getProp()+
+											"\t"+sparql.getPv()+"\t"+sparql.getTs();
+									test.set(index, lineTest);
+								}
+							}
+							for (String ss : test){
+								if (ss==null){
+									line +="\t"+"NA"+"\t"+"NA"+"\t"+"NA"+"\t"+"NA"; 
+								}
+								else line += ss;
+							}
+							fileWriter.println(line);
+							//System.out.println(line);	
+						}
+					}
+					fileWriter.close();
+
+					try {
+						importInformation.setTxtFile(file);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					//importInformation.setGexName (outFile);
+					importInformation.setFirstDataRow(1);
+					importInformation.setFirstHeaderRow(0);
+					importInformation.guessSettings();
+					importInformation.setDelimiter("\t");
+
+					getWizard().getDialog().setCursor(null);
+					return null;
+				}
+				@Override public void done()
+				{
+					getWizard().setNextFinishButtonEnabled(true);
+					getWizard().setBackButtonEnabled(true);
+				}
+			};
+			sw.execute();
+		}
+
+		public boolean listIsEmpty(ArrayList<LinkedList<SparqlResults>> arrayList){
+			int i=0;
+			for (LinkedList<SparqlResults> linked : arrayList){
+				if (linked.isEmpty()){
+					i++;
+				}			
+			}
+			if (i==arrayList.size()){
+				return false;
+			}		
+			return true;		
+		}
+
+	}*/
+
 	private class ColumnPage extends WizardPanelDescriptor
 	{
-	    public static final String IDENTIFIER = "COLUMN_PAGE";
+		public static final String IDENTIFIER = "COLUMN_PAGE";
 
-	    private ColumnTableModel ctm;
+		private ColumnTableModel ctm;
 		private JTable tblColumn;
 
-	    private JComboBox cbColId;
-	    //private JComboBox cbColSyscode;
-	    //private JRadioButton rbFixedNo;
-	    private JRadioButton rbFixedYes;
-	    private JComboBox cbDataSource;
-	    private DataSourceModel mDataSource;
+		private JComboBox cbColId;
+		//private JComboBox cbColSyscode;
+		//private JRadioButton rbFixedNo;
+		private JRadioButton rbFixedYes;
+		private JComboBox cbDataSource;
+		private DataSourceModel mDataSource;
 
-	    public ColumnPage()
-	    {
-	        super(IDENTIFIER);
-	    }
+		public ColumnPage()
+		{
+			super(IDENTIFIER);
+		}
 
-	    public Object getNextPanelDescriptor()
-	    {
-	        return ImportPage.IDENTIFIER;
-	    }
+		public Object getNextPanelDescriptor()
+		{
+			return ImportPage.IDENTIFIER;
+		}
 
-	    public Object getBackPanelDescriptor()
-	    {
-	        return FilePage.IDENTIFIER;
-	    }
+		public Object getBackPanelDescriptor()
+		{
+			return FilePage.IDENTIFIER;
+		}
 
-	    @Override
+		@Override
 		protected JPanel createContents()
 		{	    	
-		    FormLayout layout = new FormLayout (
-		    		"pref, 7dlu, pref:grow",
-		    		"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, fill:[100dlu,min]:grow");
+			FormLayout layout = new FormLayout (
+					"pref, 7dlu, pref:grow",
+					"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, fill:[100dlu,min]:grow");
 
-		    PanelBuilder builder = new PanelBuilder(layout);
-		    builder.setDefaultDialogBorder();
+			PanelBuilder builder = new PanelBuilder(layout);
+			builder.setDefaultDialogBorder();
 
-		    CellConstraints cc = new CellConstraints();
+			CellConstraints cc = new CellConstraints();
 
 			//rbFixedNo = new JRadioButton("Select a column to specify system code");
 			rbFixedYes = new JRadioButton("Use the same system code for all rows");
@@ -422,11 +689,11 @@ public class AtlasWizard extends Wizard
 			JScrollPane scrTable = new JScrollPane(tblColumn);
 
 			JViewport jv = new JViewport();
-		    jv.setView(rowHeader);
-		    jv.setPreferredSize(rowHeader.getPreferredSize());
-		    scrTable.setRowHeader(jv);
-//		    scrTable.setCorner(ScrollPaneConstants.UPPER_LEFT_CORNER, rowHeader
-//		            .getTableHeader());
+			jv.setView(rowHeader);
+			jv.setPreferredSize(rowHeader.getPreferredSize());
+			scrTable.setRowHeader(jv);
+			//		    scrTable.setCorner(ScrollPaneConstants.UPPER_LEFT_CORNER, rowHeader
+			//		            .getTableHeader());
 
 			builder.addLabel ("Select primary identifier column:", cc.xy(1,1));
 			builder.add (cbColId, cc.xy(3,1));
@@ -443,7 +710,7 @@ public class AtlasWizard extends Wizard
 				{
 					boolean result = (ae.getSource() == rbFixedYes);
 					importInformation.setSyscodeFixed(result);
-			    	columnPageRefresh();
+					columnPageRefresh();
 				}
 			};
 			rbFixedYes.addActionListener(rbAction);
@@ -460,7 +727,7 @@ public class AtlasWizard extends Wizard
 
 				public void intervalRemoved(ListDataEvent arg0) {}
 			});
-/*
+			/*
 			cbColSyscode.addActionListener(new ActionListener() {
 				public void actionPerformed(ActionEvent ae)
 				{
@@ -472,15 +739,15 @@ public class AtlasWizard extends Wizard
 				public void actionPerformed(ActionEvent ae)
 				{
 					importInformation.setIdColumn(cbColId.getSelectedIndex());
-			    	columnPageRefresh();
+					columnPageRefresh();
 				}
 			});
 			return builder.getPanel();
 		}
 
-	    private class ColumnPopupListener extends MouseAdapter
-	    {
-	    	@Override public void mousePressed (MouseEvent e)
+		private class ColumnPopupListener extends MouseAdapter
+		{
+			@Override public void mousePressed (MouseEvent e)
 			{
 				showPopup(e);
 			}
@@ -541,11 +808,11 @@ public class AtlasWizard extends Wizard
 					columnPageRefresh();
 				}
 			}
-	    }
+		}
 
-	    private class RowPopupListener extends MouseAdapter
-	    {
-	    	@Override public void mousePressed (MouseEvent e)
+		private class RowPopupListener extends MouseAdapter
+		{
+			@Override public void mousePressed (MouseEvent e)
 			{
 				showPopup(e);
 			}
@@ -599,11 +866,11 @@ public class AtlasWizard extends Wizard
 				}
 			}
 
-	    }
+		}
 
-	    private void columnPageRefresh()
-	    {
-	    	String error = null;
+		private void columnPageRefresh()
+		{
+			String error = null;
 			if (importInformation.isSyscodeFixed())
 			{
 				rbFixedYes.setSelected (true);
@@ -617,31 +884,31 @@ public class AtlasWizard extends Wizard
 				cbDataSource.setEnabled (false);
 
 				if (importInformation.getIdColumn() == importInformation.getSyscodeColumn())
-	    		{
-	    			error = "System code column and Id column can't be the same";
-	    		}
+				{
+					error = "System code column and Id column can't be the same";
+				}
 			}
-		    getWizard().setNextFinishButtonEnabled(error == null);
-		    getWizard().setErrorMessage(error == null ? "" : error);
+			getWizard().setNextFinishButtonEnabled(error == null);
+			getWizard().setErrorMessage(error == null ? "" : error);
 			getWizard().setPageTitle ("Choose column types");
 
-	    	ctm.refresh();
-	    }
+			ctm.refresh();
+		}
 
-	    private void refreshComboBoxes()
-	    {
-	    	mDataSource.setSelectedItem(importInformation.getDataSource());
+		private void refreshComboBoxes()
+		{
+			mDataSource.setSelectedItem(importInformation.getDataSource());
 			cbColId.setSelectedIndex(importInformation.getIdColumn());
 			//cbColSyscode.setSelectedIndex(importInformation.getSyscodeColumn());
-	    }
+		}
 
-	    /**
-	     * A simple cell Renderer for combo boxes that use the
-	     * column index integer as value,
-	     * but will display the column name String
-	     */
-	    private class ColumnNameRenderer extends JLabel implements ListCellRenderer
-	    {
+		/**
+		 * A simple cell Renderer for combo boxes that use the
+		 * column index integer as value,
+		 * but will display the column name String
+		 */
+		private class ColumnNameRenderer extends JLabel implements ListCellRenderer
+		{
 			public ColumnNameRenderer()
 			{
 				setOpaque(true);
@@ -650,16 +917,16 @@ public class AtlasWizard extends Wizard
 			}
 
 			/*
-			* This method finds the image and text corresponding
-			* to the selected value and returns the label, set up
-			* to display the text and image.
-			*/
+			 * This method finds the image and text corresponding
+			 * to the selected value and returns the label, set up
+			 * to display the text and image.
+			 */
 			public Component getListCellRendererComponent(
-			                        JList list,
-			                        Object value,
-			                        int index,
-			                        boolean isSelected,
-			                        boolean cellHasFocus)
+					JList list,
+					Object value,
+					int index,
+					boolean isSelected,
+					boolean cellHasFocus)
 			{
 				//Get the selected index. (The index param isn't
 				//always valid, so just use the value.)
@@ -683,38 +950,38 @@ public class AtlasWizard extends Wizard
 			}
 		}
 
-	    public void aboutToDisplayPanel()
-	    {
-	    	// create an array of size getSampleMaxNumCols()
-	    	Integer[] cn;
-	    	int max = importInformation.getSampleMaxNumCols();
-    		cn = new Integer[max];
-    		for (int i = 0; i < max; ++i) cn[i] = i;
+		public void aboutToDisplayPanel()
+		{
+			// create an array of size getSampleMaxNumCols()
+			Integer[] cn;
+			int max = importInformation.getSampleMaxNumCols();
+			cn = new Integer[max];
+			for (int i = 0; i < max; ++i) cn[i] = i;
 
-	    	cbColId.setRenderer(new ColumnNameRenderer());
-	    	//cbColSyscode.setRenderer(new ColumnNameRenderer());
-	    	cbColId.setModel(new DefaultComboBoxModel(cn));
-	    	//cbColSyscode.setModel(new DefaultComboBoxModel(cn));
+			cbColId.setRenderer(new ColumnNameRenderer());
+			//cbColSyscode.setRenderer(new ColumnNameRenderer());
+			cbColId.setModel(new DefaultComboBoxModel(cn));
+			//cbColSyscode.setModel(new DefaultComboBoxModel(cn));
 
 			columnPageRefresh();
 			refreshComboBoxes();
 
-	    	ctm.refresh();
-	    }
+			ctm.refresh();
+		}
 
-	    @Override
-	    public void aboutToHidePanel()
-	    {
-	    	importInformation.setSyscodeFixed(rbFixedYes.isSelected());
-	    	if (rbFixedYes.isSelected())
-	    	{
-		    	importInformation.setDataSource(mDataSource.getSelectedDataSource());
-	    	}
-	    }
-	    
+		@Override
+		public void aboutToHidePanel()
+		{
+			importInformation.setSyscodeFixed(rbFixedYes.isSelected());
+			if (rbFixedYes.isSelected())
+			{
+				importInformation.setDataSource(mDataSource.getSelectedDataSource());
+			}
+		}
+
 	}
-	
-	
+
+
 	private class ImportPage extends WizardPanelDescriptor implements ProgressListener
 	{
 		public static final String IDENTIFIER = "IMPORT_PAGE";
@@ -857,34 +1124,68 @@ public class AtlasWizard extends Wizard
 	{
 		VisualizationManager visMgr = standaloneEngine.getVisualizationManager(); 
 		ColorSetManager csmgr = visMgr.getColorSetManager();
+		DataInterface gex = standaloneEngine.getGexManager().getCurrentGex();
 		ColorSet cs = new ColorSet(csmgr);
+		//ColorSet colorRuleset = new ColorSet(csmgr);
+		//csmgr.addColorSet(colorRuleset);
 		csmgr.addColorSet(cs);
 
 		ColorGradient gradient = new ColorGradient();
+		double lowerbound = makeRoundNumber (-10); 
+		double upperbound = makeRoundNumber (10);
+		gradient.addColorValuePair(new ColorValuePair(Color.BLUE, lowerbound));
+		gradient.addColorValuePair(new ColorValuePair(Color.RED, upperbound));
 		cs.setGradient(gradient);
 
-		double lowerbound = makeRoundNumber (info.getMinimum() - info.getMinimum() / 10); 
-		double upperbound = makeRoundNumber (info.getMaximum() + info.getMaximum() / 10);
-		gradient.addColorValuePair(new ColorValuePair(Color.YELLOW, lowerbound));
-		gradient.addColorValuePair(new ColorValuePair(Color.BLUE, upperbound));
+
+		//double lowerbound = makeRoundNumber (info.getMinimum() - info.getMinimum() / 10); 
+		//double upperbound = makeRoundNumber (info.getMaximum() + info.getMaximum() / 10);
 
 		Visualization v = new Visualization("auto-generated");
 
 		ColorByExpression cby = new ColorByExpression(standaloneEngine.getGexManager(), 
-				standaloneEngine.getVisualizationManager().getColorSetManager());
-		DataInterface gex = standaloneEngine.getGexManager().getCurrentGex();
-
+				csmgr);
+		/*
 		int count = Math.min (5, gex.getSamples().keySet().size());
 		for (int i = 0; i < count; ++i)
 		{			
 			cby.addUseSample(gex.getSample(i));
+		}*/
+	
+		Map<Integer, ? extends ISample> samplesMap = gex.getSamples();
+		for(Entry<Integer, ? extends ISample> entry : samplesMap.entrySet()) {
+			//Integer cle = entry.getKey();
+			ISample valeur = entry.getValue();
+			String dataValue = valeur.getName().trim();
+			if (dataValue.endsWith("tStat")) {
+				cby.addUseSample(valeur);
+				ConfiguredSample csample = cby.getConfiguredSample(valeur);
+				csample.setColorSet(cs);
+			}
+			if (dataValue.endsWith("pValue")){
+				cby.addUseSample(valeur);
+				ConfiguredSample csample = cby.getConfiguredSample(valeur);
+				ColorSet colorRuleset = new ColorSet(csmgr);
+				ColorRule ruleInf = new ColorRule();
+				ruleInf.setExpression("["+dataValue+"] < 0.05",
+						gex.getSampleNames());
+				ruleInf.setColor(Color.GREEN);
+				ColorRule ruleSup = new ColorRule();
+				ruleSup.setExpression("["+dataValue+"] >= 0.05",
+						gex.getSampleNames());
+				ruleSup.setColor(Color.WHITE);
+				colorRuleset.addRule(ruleInf);
+				colorRuleset.addRule(ruleSup);
+				csample.setColorSet(colorRuleset);
+				
+			}
 		}
-		cby.setSingleColorSet(cs);
+		//cby.setSingleColorSet(cs);
 		v.addMethod(cby);
-
 		DataNodeLabel dnl = new DataNodeLabel();
 		v.addMethod(dnl);
 
+		visMgr.removeVisualization(v);
 		visMgr.addVisualization(v);
 		visMgr.setActiveVisualization(v);
 	}	
