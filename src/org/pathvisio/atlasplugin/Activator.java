@@ -19,6 +19,7 @@ package org.pathvisio.atlasplugin;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.pathvisio.atlasplugin.plugin.AtlasPlugin;
 import org.pathvisio.desktop.plugin.Plugin;
 
 public class Activator implements BundleActivator {
