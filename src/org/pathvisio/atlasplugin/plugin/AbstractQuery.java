@@ -8,6 +8,12 @@ import org.pathvisio.atlasplugin.utils.ObservableAtlas;
 import org.pathvisio.atlasplugin.utils.ObserverAtlas;
 import org.pathvisio.gexplugin.ImportInformation;
 
+/**
+* Abstract class to query Expression Atlas database.
+* Retrieve the list of experiment id and the dataset.
+* @author Jonathan Melius
+* @see ObservableAtlas
+*/
 
 public abstract class AbstractQuery implements ObservableAtlas{
 

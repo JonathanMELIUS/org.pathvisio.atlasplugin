@@ -1,1 +1,5 @@
 org.pathvisio.atlasplugin
+org.pathvisio.atlasplugin.gui
+org.pathvisio.atlasplugin.plugin
+org.pathvisio.atlasplugin.test
+org.pathvisio.atlasplugin.utils

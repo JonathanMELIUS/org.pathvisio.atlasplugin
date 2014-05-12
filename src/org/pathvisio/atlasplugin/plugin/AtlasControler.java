@@ -1,5 +1,9 @@
 package org.pathvisio.atlasplugin.plugin;
 
+/**
+* Choose the way to query the Expression Atlas database.
+* @author Jonathan Melius
+*/
 
 public class AtlasControler {
 	

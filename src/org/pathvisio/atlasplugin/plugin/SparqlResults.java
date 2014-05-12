@@ -1,5 +1,11 @@
 package org.pathvisio.atlasplugin.plugin;
 
+/**
+* Stock the necessary information of the Sparql query.
+* @author Jonathan Melius
+* @see SparqlQuery
+*/
+
 public class SparqlResults {
 	private String exp;
 	private String prop;

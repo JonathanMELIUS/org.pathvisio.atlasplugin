@@ -22,6 +22,13 @@ import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.query.Syntax;
 import com.hp.hpl.jena.sparql.engine.http.QueryEngineHTTP;
 
+/**
+* Query Expression Atlas database by RDF using the Sparql endpoint.
+* Retrieve the list of experiment id and the dataset.
+* @see AbstractQuery
+* @author Jonathan Melius
+*/
+
 public class AtlasQuery extends AbstractQuery {
 	
 	public AtlasQuery(){

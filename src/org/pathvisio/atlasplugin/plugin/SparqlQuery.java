@@ -1,12 +1,7 @@
 package org.pathvisio.atlasplugin.plugin;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -19,6 +14,13 @@ import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.query.Syntax;
 import com.hp.hpl.jena.sparql.engine.http.QueryEngineHTTP;
+
+/**
+* Using the Jena API (http://jena.apache.org)
+* to querying the Expression Atlas SPARQL endpoint 
+* @author Jonathan Melius
+* @see AtlasQuery
+*/
 
 public class SparqlQuery {
 

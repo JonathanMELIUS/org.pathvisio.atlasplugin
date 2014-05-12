@@ -78,6 +78,13 @@ import com.jgoodies.forms.layout.FormLayout;
 import com.nexes.wizard.Wizard;
 import com.nexes.wizard.WizardPanelDescriptor;
 
+/**
+* Wizard to guide the user through importing dataset 
+* from Expression Atlas in PathVisio.
+* @author Jonathan Melius
+* @see ObserverAtlas
+*/
+
 public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeListener 
 {
 	private ImportInformation importInformation;
@@ -135,30 +142,32 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 //		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 //		contentPane.setLayout(new BorderLayout(0, 0));
 //        frame.setContentPane(contentPane);
-		init.setTitle("Initialization");
-		init.setSize(400,50);
-		
-		init.setLocationRelativeTo(null);  
-	    
-		progressBar = new JProgressBar(0,100);
-	    progressBar.setValue(25);
-		progressBar.setSize(400, 100);
-		progressBar.setStringPainted(true);
-		
-		init.getContentPane().add(progressBar);
-        //System.out.println("too");		
-		init.setVisible(true);
-		Task task = new Task();
-		//task.addPropertyChangeListener(this);		
-		task.execute();
-		try {
-			task.get();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ExecutionException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		if (AtlasWizard.idExperiment.isEmpty()==true){
+			init.setTitle("Initialization");
+			init.setSize(400,50);
+
+			init.setLocationRelativeTo(null);  
+
+			progressBar = new JProgressBar(0,100);
+			progressBar.setValue(25);
+			progressBar.setSize(400, 100);
+			progressBar.setStringPainted(true);
+
+			init.getContentPane().add(progressBar);
+			//System.out.println("too");		
+			init.setVisible(true);
+			Task task = new Task();
+			//task.addPropertyChangeListener(this);		
+			task.execute();
+			try {
+				task.get();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (ExecutionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
 	
@@ -331,187 +340,6 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 			}
 		}		
 	}
-	/*private class DownloadPage extends WizardPanelDescriptor
-	{
-
-		public static final String IDENTIFIER = "DOWNLOAD_PAGE";
-
-		private JProgressBar progressBar;
-		private JTextArea progressText;
-		private JLabel lblTask;
-
-		private ArrayList<String> queryList;
-		private Map<String, Map<String, LinkedList<SparqlResults>>> data ;
-
-		public DownloadPage() {
-			super(IDENTIFIER);
-		}
-
-		public Object getNextPanelDescriptor()
-		{
-			return ColumnPage.IDENTIFIER;
-		}
-
-		public Object getBackPanelDescriptor()
-		{
-			return FilePage.IDENTIFIER;
-		}
-
-		@Override
-		protected JPanel createContents() {
-			FormLayout layout = new FormLayout(
-					"fill:[100dlu,min]:grow",
-					"pref, pref, fill:pref:grow"
-					);
-
-			DefaultFormBuilder builder = new DefaultFormBuilder(layout);
-			builder.setDefaultDialogBorder();
-
-			progressBar = new JProgressBar(0, 100);
-			builder.append(progressBar);
-			builder.nextLine();
-			lblTask = new JLabel();
-			builder.append(lblTask);
-			progressText = new JTextArea();
-			builder.append(new JScrollPane(progressText));
-			return builder.getPanel();
-		}
-		public void aboutToDisplayPanel()
-		{
-			getWizard().setPageTitle ("Perform import");
-
-			getWizard().setNextFinishButtonEnabled(false);
-			getWizard().setBackButtonEnabled(false);
-		}
-
-		public void displayingPanel()
-		{			
-			SwingWorker<Void, Void> sw = new SwingWorker<Void, Void>() {
-				@Override protected Void doInBackground() {
-					getWizard().getDialog().setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-					getWizard().setNextFinishButtonEnabled(false);
-					getWizard().setBackButtonEnabled(false);
-					//String outFile = null;
-					//File f = new File(txtOutput.getText());
-					String path = "/home/mael/outpute.txt";
-					File file = null;
-					PrintWriter fileWriter = null;
-
-					//experiment = expInput.getText();
-
-					queryList = new ArrayList<String>(Arrays.asList(experiment.split(" ")));
-					data = new HashMap<String,Map<String,LinkedList<SparqlResults>>>();
-
-					String prop = "propertyValue";
-					String pValue ="pValue";
-					String tStat = "tStat";
-					String probe = "probe";
-					String header = "Gene_ID";
-
-					try {
-						//f.getCanonicalPath();
-						//f=FileUtils.replaceExtension(f, "pgex");
-						//outFile = f.getCanonicalPath();
-
-						file = new File(path);
-						fileWriter = new PrintWriter(new FileWriter(file));
-						for (String query : queryList){
-							header += "\t"+query+"-"+probe+"\t"+query+"-"+prop+"\t"+query+"-"+pValue+"\t"+query+"-"+tStat;
-						}
-						fileWriter.println(header);
-						//f0.close();
-						//f0 = new PrintWriter(new FileWriter(file, true));
-					} catch (IOException e) {
-						e.printStackTrace();
-					}	
-					int progress = 0 ;
-					for (String query : queryList){
-						System.out.println(query);
-						//new SparqlQuery (query,file);
-						new SparqlQuery (query,data);
-						progress += 100/queryList.size();
-						System.out.println(progress);
-						progressBar.setValue(progress);
-					}
-
-					//E-GEOD-18842 E-GEOD-6731 E-GEOD-8977 E-GEOD-6088
-					//new SparqlQuery ("E-GEOD-18842",file);
-					//new SparqlQuery ("E-GEOD-6731",file);
-					//new SparqlQuery (experiment,file);
-
-					//E-GEOD-10821
-
-					for(Entry<String,Map<String,LinkedList<SparqlResults>>> entry : data.entrySet()) {
-						String key = entry.getKey();
-						Map<String,LinkedList<SparqlResults>> value = entry.getValue();
-						ArrayList<LinkedList<SparqlResults>> resultList = new ArrayList<LinkedList<SparqlResults>>();
-						for(Entry<String,LinkedList<SparqlResults>> expEntry : value.entrySet()) {
-							resultList.add(expEntry.getValue());
-						}				
-						while (listIsEmpty(resultList)){
-							String line = key;
-							String[] tab = new String[queryList.size()];
-							ArrayList<String> test = new ArrayList<String>(Arrays.asList(tab));
-							for (LinkedList<SparqlResults> lili : resultList) {
-								SparqlResults sparql = lili.pollFirst();
-								if (!(sparql==null)){
-									int index = queryList.indexOf(sparql.getExp());
-									String lineTest = "\t"+sparql.getProb()+
-											"\t"+sparql.getExp()+sparql.getProp()+
-											"\t"+sparql.getPv()+"\t"+sparql.getTs();
-									test.set(index, lineTest);
-								}
-							}
-							for (String ss : test){
-								if (ss==null){
-									line +="\t"+"NA"+"\t"+"NA"+"\t"+"NA"+"\t"+"NA"; 
-								}
-								else line += ss;
-							}
-							fileWriter.println(line);
-							//System.out.println(line);	
-						}
-					}
-					fileWriter.close();
-
-					try {
-						importInformation.setTxtFile(file);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-					//importInformation.setGexName (outFile);
-					importInformation.setFirstDataRow(1);
-					importInformation.setFirstHeaderRow(0);
-					importInformation.guessSettings();
-					importInformation.setDelimiter("\t");
-
-					getWizard().getDialog().setCursor(null);
-					return null;
-				}
-				@Override public void done()
-				{
-					getWizard().setNextFinishButtonEnabled(true);
-					getWizard().setBackButtonEnabled(true);
-				}
-			};
-			sw.execute();
-		}
-
-		public boolean listIsEmpty(ArrayList<LinkedList<SparqlResults>> arrayList){
-			int i=0;
-			for (LinkedList<SparqlResults> linked : arrayList){
-				if (linked.isEmpty()){
-					i++;
-				}			
-			}
-			if (i==arrayList.size()){
-				return false;
-			}		
-			return true;		
-		}
-
-	}*/
-
 	private class ColumnPage extends WizardPanelDescriptor
 	{
 		public static final String IDENTIFIER = "COLUMN_PAGE";

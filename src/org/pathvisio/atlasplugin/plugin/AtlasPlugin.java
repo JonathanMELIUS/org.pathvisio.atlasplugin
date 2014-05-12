@@ -10,14 +10,11 @@ import org.pathvisio.desktop.PvDesktop;
 import org.pathvisio.desktop.plugin.Plugin;
 
 /**
- * @author Simon Jupp
- * @date 11/09/2013
- * Functional Genomics Group EMBL-EBI
- *
- * Example of querying the Gene Expression Atlas SPARQL endpoint from Java
- * using the Jena API (http://jena.apache.org)
- *
- */
+* Initialize the Atlas plugin in the PathVisio's GUI.
+* This plugin import datasets from expression Atlas. Currently only one menu item
+* to import and visualize the data expression.
+* @author Jonathan Melius
+*/
 public class AtlasPlugin implements Plugin{
 	private PvDesktop desktop;
 	@Override
