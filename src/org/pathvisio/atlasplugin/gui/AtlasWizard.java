@@ -7,6 +7,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,6 +67,7 @@ import org.pathvisio.desktop.visualization.ColorGradient.ColorValuePair;
 import org.pathvisio.gexplugin.GexTxtImporter;
 import org.pathvisio.gexplugin.ImportInformation;
 import org.pathvisio.gui.DataSourceModel;
+import org.pathvisio.gui.ProgressDialog;
 import org.pathvisio.gui.util.PermissiveComboBox;
 import org.pathvisio.visualization.plugins.ColorByExpression;
 import org.pathvisio.visualization.plugins.DataNodeLabel;
@@ -79,11 +81,11 @@ import com.nexes.wizard.Wizard;
 import com.nexes.wizard.WizardPanelDescriptor;
 
 /**
-* Wizard to guide the user through importing dataset 
-* from Expression Atlas in PathVisio.
-* @author Jonathan Melius
-* @see ObserverAtlas
-*/
+ * Wizard to guide the user through importing dataset 
+ * from Expression Atlas in PathVisio.
+ * @author Jonathan Melius
+ * @see ObserverAtlas
+ */
 
 public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeListener 
 {
@@ -94,13 +96,12 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 	private ColumnPage cpd;
 	private ImportPage ipd;
 
-
 	private final PvDesktop standaloneEngine;
+	private int progress;
+	
+	private ProgressKeeper pk = new ProgressKeeper(100);
 	private static ArrayList<String> idExperiment = new ArrayList<String>();
 
-	private JProgressBar progressBar;
-	private JFrame init = new JFrame();
-	private int progress;
 	public AtlasWizard (PvDesktop standaloneEngine, AtlasControler atlasControler)
 	{
 		this.standaloneEngine = standaloneEngine;
@@ -116,62 +117,40 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 		setCurrentPanel(FilePage.IDENTIFIER);
 	}
 	public void initialization(){
+		ProgressKeeper pk = new ProgressKeeper(100);
 		class Task extends SwingWorker<Void, Void> {
+			private ProgressKeeper pk;
+
+			public Task(ProgressKeeper pk){
+				this.pk=pk;
+			}
 			@Override
 			public Void doInBackground() {				
-				setProgress(50);
+				pk.setProgress(50);
 				atlasControler.queryID();
-				setProgress(75);
+				pk.setProgress(100);
 				return null;
 			}
 
 			@Override
-			public void done() {
-				//Toolkit.getDefaultToolkit().beep();
-				progressBar.setValue(100);
-				init.setVisible(false); //you can't see me!
-				init.dispose();
+			public void done() {	
+				pk.setTaskName("Done");
 			}			
 		}
-		/*frame.pack();
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setVisible(true);*/		
-		//frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-//		frame.setBounds(100, 100, 450, 300);
-//		JPanel contentPane = new JPanel();
-//		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
-//		contentPane.setLayout(new BorderLayout(0, 0));
-//        frame.setContentPane(contentPane);
-		if (AtlasWizard.idExperiment.isEmpty()==true){
-			init.setTitle("Initialization");
-			init.setSize(400,50);
 
-			init.setLocationRelativeTo(null);  
-
-			progressBar = new JProgressBar(0,100);
-			progressBar.setValue(25);
-			progressBar.setSize(400, 100);
-			progressBar.setStringPainted(true);
-
-			init.getContentPane().add(progressBar);
-			//System.out.println("too");		
-			init.setVisible(true);
-			Task task = new Task();
-			//task.addPropertyChangeListener(this);		
+		if (AtlasWizard.idExperiment.isEmpty()==true){		
+			ProgressDialog d = new ProgressDialog(
+					JOptionPane.getFrameForComponent(standaloneEngine.getSwingEngine().getFrame()),
+					"Initialization", pk, true, true
+					);
+			Task task = new Task(pk);	
 			task.execute();
-			try {
-				task.get();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (ExecutionException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			d.setVisible(true);	
 		}
 	}
-	
-	private class FilePage extends WizardPanelDescriptor implements ActionListener
+
+	private class FilePage extends WizardPanelDescriptor 
+	implements ActionListener, ProgressListener
 	{
 		public static final String IDENTIFIER = "FILE_PAGE";
 		private static final String ACTION_OUTPUT = "output";
@@ -184,6 +163,7 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 		private JButton btnOutput;
 		private boolean txtOutputComplete;
 		private JProgressBar progressBar;
+		
 
 		public void aboutToDisplayPanel()
 		{
@@ -229,10 +209,12 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 			btnOutput = new JButton ("Browse");
 			expInput.setFocusTraversalKeysEnabled(false);
 
-			progressBar = new JProgressBar(0, 100);
+
+			progressBar = new JProgressBar(0, 100);			
 			progressBar.setValue(0);
 			progressBar.setStringPainted(true);
-
+			progressBar.setVisible(false);			
+			
 			FormLayout layout = new FormLayout (
 					"right:pref, 3dlu, pref, 3dlu, pref",
 					"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, pref");
@@ -305,8 +287,82 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 			getWizard().getDialog().setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 			getWizard().setNextFinishButtonEnabled(false);
 			getWizard().setBackButtonEnabled(false);
-			atlasControler.queryExp(txtOutput.getText(), expInput.getText());
+			/*
+			class MyWorker extends SwingWorker<String, Void>  {				
+				protected String doInBackground() {			
+					
+					atlasControler.queryExp(txtOutput.getText(), expInput.getText(),pk);
+					
+					// Do my downloading code
+					return "Done.";
+				}
+
+				protected void done() {
+//					progressBar.setVisible(false);
+				}
+			}
+			pk.addListener(this);
+			MyWorker work = new MyWorker();
+			progressBar.setVisible(true);
+			work.execute();
+			
+			try {
+				work.get();
+			} catch (InterruptedException | ExecutionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			*/
+			
+			class Task extends SwingWorker<Void, Void> {
+				private ProgressKeeper pk;
+
+				public Task(ProgressKeeper pk){
+					this.pk=pk;
+				}
+				@Override
+				public Void doInBackground() {					
+//					pk.setProgress(50);
+					atlasControler.queryExp(txtOutput.getText(), expInput.getText(),pk);
+//					pk.setProgress(100);
+					return null;
+				}
+
+				@Override
+				public void done() {	
+					pk.setTaskName("Done");
+				}			
+			}
+
+			ProgressDialog d = new ProgressDialog(
+					JOptionPane.getFrameForComponent(standaloneEngine.getSwingEngine().getFrame()),
+					"Download", pk, true, true
+					);
+			Task task = new Task(pk);	
+			task.execute();
+			d.setVisible(true);	
+			try {
+				task.get();
+			} catch (InterruptedException | ExecutionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
 			getWizard().getDialog().setCursor(null);
+		}
+		@Override
+		public void progressEvent(ProgressEvent e) {
+			switch(e.getType()) {
+			case ProgressEvent.FINISHED:
+				progressBar.setValue(pk.getTotalWork());
+				progressBar.setVisible(false);
+			
+			case ProgressEvent.PROGRESS_CHANGED:
+				System.out.println("lazy!");
+				progressBar.setValue(pk.getProgress());
+				break;
+			}
+			
 		}
 
 		public void actionPerformed(ActionEvent e) {
@@ -338,7 +394,9 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 					Logger.log.error("No gex database connector", ex);
 				}
 			}
-		}		
+		}
+
+		
 	}
 	private class ColumnPage extends WizardPanelDescriptor
 	{
@@ -938,7 +996,9 @@ public class AtlasWizard extends Wizard implements ObserverAtlas,PropertyChangeL
 	@Override
 	public void update(int progress) {
 		// TODO Auto-generated method stub
-		this.progress=progress;
+		//this.progress=progress;
+		pk.setProgress(progress);
+		
 	}
 
 

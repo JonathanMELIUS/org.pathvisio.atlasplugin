@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.pathvisio.atlasplugin.utils.ObservableAtlas;
 import org.pathvisio.atlasplugin.utils.ObserverAtlas;
+import org.pathvisio.core.util.ProgressKeeper;
 import org.pathvisio.gexplugin.ImportInformation;
 
 /**
@@ -31,7 +32,7 @@ public abstract class AbstractQuery implements ObservableAtlas{
 
 	public abstract void queryID();
 
-	public abstract void queryExperiment(String txtOutput, String experiment);
+	public abstract void queryExperiment(String txtOutput, String experiment,ProgressKeeper pk);
 
 	@Override
 	public void addObserver(ObserverAtlas obs) {

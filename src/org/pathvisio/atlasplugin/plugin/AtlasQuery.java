@@ -13,6 +13,9 @@ import java.util.Map.Entry;
 
 import org.bridgedb.DataSource;
 import org.pathvisio.core.util.FileUtils;
+import org.pathvisio.core.util.ProgressKeeper;
+
+import arq.update;
 
 import com.hp.hpl.jena.query.ParameterizedSparqlString;
 import com.hp.hpl.jena.query.Query;
@@ -63,7 +66,7 @@ public class AtlasQuery extends AbstractQuery {
 		notifyObservers(idExperiment); 
 		//System.out.println("ss"+idExperiment.size());
 	}
-	public void queryExperiment(String txtOutput, String experiment) {
+	public void queryExperiment(String txtOutput, String experiment,ProgressKeeper pk) {
 		
 		String outputFileName = null;
 		File outputFile = new File(txtOutput);
@@ -95,13 +98,20 @@ public class AtlasQuery extends AbstractQuery {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}	
-		//int progress = 0 ;
+		int progress = 0 ;
+		//pk.setProgress(0);
 		for (String query : queryList){
 			System.out.println(query);
+			progress += 100/queryList.size()/2;
+			notifyObservers(progress);
+//			pk.setProgress(progress);
 			new SparqlQuery (query,data);
+			progress += 100/queryList.size()/2;
+//			pk.setProgress(progress);
 			//progress += 100/queryList.size();
 			//System.out.println(progress);
 			//progressBar.setValue(progress);
+			notifyObservers(progress);
 		}
 	
 		for(Entry<String,Map<String,LinkedList<SparqlResults>>> entry : data.entrySet()) {
