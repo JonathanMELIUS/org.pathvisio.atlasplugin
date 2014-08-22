@@ -27,9 +27,6 @@ public class SparqlQuery {
 	public SparqlQuery (String experiment, 
 			Map<String,Map<String,LinkedList<SparqlResults>>> data){
 		String sparqlEndpoint = "http://www.ebi.ac.uk/rdf/services/atlas/sparql";
-		//E-GEOD-10821 E-GEOD-18842 human 
-		//E-GEOD-22322 E-MTAB-901  mouse
-		//E-ATMX-34 E-ATMX-20 E-ATMX-6 Arabidopsis
 		String sparqlQuery = ""+
 				"PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"+
 				"PREFIX dcterms: <http://purl.org/dc/terms/>"+
@@ -56,8 +53,7 @@ public class SparqlQuery {
 				"}";
 
 		DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-		Date date = new Date();		
-		System.out.println(dateFormat.format(date));
+		Date date = new Date();	
 
 		// create the Jena query using the ARQ syntax (has additional support for SPARQL federated queries)
 		Query query = QueryFactory.create(sparqlQuery, Syntax.syntaxARQ) ;
@@ -70,7 +66,6 @@ public class SparqlQuery {
 
 		dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 		date = new Date();
-		System.out.println(dateFormat.format(date));
 
 
 		int i=0;
@@ -83,11 +78,9 @@ public class SparqlQuery {
 				i++;
 			}
 		}
-		System.out.println("nb"+i+" "+k);
 
 		dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 		date = new Date();
-		System.out.println(dateFormat.format(date));
 
 	}
 	public int traitement (Map<String,Map<String,LinkedList<SparqlResults>>> data,
